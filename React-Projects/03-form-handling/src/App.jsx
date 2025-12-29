@@ -102,7 +102,7 @@ const App = () => {
                             index={index}
                             photo={user.photo}
                             name={user.name}
-                            age={user.name}
+                            age={user.age}
                             bio={user.bio}
                             mobile={user.mobile}
                             deleteHandler={deleteHandler}
