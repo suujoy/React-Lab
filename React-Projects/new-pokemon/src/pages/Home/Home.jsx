@@ -5,7 +5,6 @@ import Arrow from "../../components/Arrow";
 import HomeIMG from "../../components/HomeIMG";
 
 const Home = (props) => {
-    console.log(props)
     return (
         <div className="bg-slate-800 max-w-[1700px] m-auto h-fit py-4 px-3 grid grid-cols-1 xl:grid-cols-3 gap-3">
             <div className="hidden xl:block xl:col-span-1">
