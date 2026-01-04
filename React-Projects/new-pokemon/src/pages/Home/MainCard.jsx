@@ -8,12 +8,15 @@ const MainCard = (props) => {
                 const img = val.sprites.front_default;
                 const name = val.name;
                 const allTypes = val.types.map((type) => type.type.name);
-                // console.log(allTypes)
-                // const realType = allTypes[1] ? allTypes[1] : allTypes[0];
-                // console.log(realType);
 
                 return (
-                    <Card key={index} img={img} name={name} type={allTypes} />
+                    <Card
+                        pokemon={val}
+                        key={index}
+                        img={img}
+                        name={name}
+                        type={allTypes}
+                    />
                 );
             })}
         </div>

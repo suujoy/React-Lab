@@ -1,6 +1,8 @@
 import React from "react";
 import CardIMG from "./CardIMG";
 import Name from "./Name";
+import { Link } from "react-router-dom";
+import PokeDetail from "../Pokemon/PokeDetail";
 
 const Card = (props) => {
     // Gradients for bg color based on typeGradient
@@ -50,7 +52,10 @@ const Card = (props) => {
 
     return (
         <div
-            className={`h-[265px] rounded p-3 flex flex-col gap-4 ${gradient} `}
+            onClick={()=>{
+               console.log(props.pokemon)
+            }}
+            className={`h-[265px] rounded-xl p-3 flex flex-col gap-4 ${gradient} `}
         >
             <CardIMG img={props.img} />
             <Name name={props.name} type={props.type} />

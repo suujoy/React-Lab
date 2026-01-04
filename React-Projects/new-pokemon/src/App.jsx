@@ -3,12 +3,15 @@ import Nav from "./components/Nav";
 import Home from "./pages/Home/Home";
 
 import axios from "axios";
+import { Route, Routes } from "react-router-dom";
+import PokeDetail from "./pages/Pokemon/PokeDetail";
 
 const App = () => {
     const [limit, setLimit] = useState(6);
     const [offset, setOffset] = useState(0);
 
     const [allPokemon, setAllPokemon] = useState([]);
+    const [pageNum, setPageNum] = useState(1);
 
     const getAPI = async () => {
         // Main URL Fetch
@@ -25,18 +28,20 @@ const App = () => {
             allPokeURL.map((val) => axios.get(val))
         );
         const allpoke = response.map((val) => val.data);
-        console.log(allpoke);
+        // console.log(allpoke)
 
         // Set UseState for allPokemon Array
-        // setAllPokemon((prev) => [...prev, ...allpoke]);
         setAllPokemon(allpoke);
     };
 
     const nextSixBtn = () => {
         setOffset((prev) => prev + limit);
+        setPageNum((prev) => prev + 1);
     };
+
     const prevSixBtn = () => {
         setOffset((prev) => Math.max(0, prev - limit));
+        setPageNum((prev) => Math.max(1, prev - 1));
     };
     useEffect(() => {
         getAPI();
@@ -47,7 +52,20 @@ const App = () => {
             <div className="sticky top-0 z-50">
                 <Nav />
             </div>
-            <Home val={allPokemon} next={nextSixBtn} prev={prevSixBtn} />
+            <Routes>
+                <Route
+                    path="/"
+                    element={
+                        <Home
+                            val={allPokemon}
+                            next={nextSixBtn}
+                            page={pageNum}
+                            prev={prevSixBtn}
+                        />
+                    }
+                />
+                <Route path="/pokedetails" element={<PokeDetail />} />
+            </Routes>
         </div>
     );
 };
