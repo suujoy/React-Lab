@@ -1,0 +1,5 @@
+@import "tailwindcss";
+
+#moviepage::-webkit-scrollbar {
+    display: none;
+}
