@@ -1,0 +1,66 @@
+.dock {
+    display: flex;
+    position: absolute;
+    bottom: 1rem;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #2221215d;
+
+    padding-inline: 1rem;
+    padding-block: 0.75rem;
+    border-radius: 0.75rem;
+
+    backdrop-filter: blur(4px);
+    gap: .75rem;
+
+    .icon {
+        padding: 0.6rem;
+        border-radius: 0.5rem;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        aspect-ratio: 1/1;
+
+        img {
+            width: 15px;
+        }
+    }
+
+    .github,.cli {
+        background: black;
+    }
+
+    .note {
+        background: linear-gradient(
+            to bottom,
+            rgb(202, 136, 14),
+            rgb(255, 218, 150)
+        );
+    }
+    .pdf {
+        background: linear-gradient(
+            to bottom,
+            rgb(246, 94, 137),
+            rgb(235, 27, 86)
+        );
+    }
+
+    .calender,
+    .mail {
+        background: linear-gradient(
+            to bottom,
+            rgb(116, 105, 236),
+            rgb(51, 34, 247)
+        );
+    }
+    .spotify {
+        background: linear-gradient(
+            to bottom left,
+            rgb(35, 167, 15),
+            rgb(152, 255, 136)
+        );
+    }
+    .link{
+        background: linear-gradient(to bottom , rgb(248, 121, 182), rgb(241, 41, 138));
+    }
+}
