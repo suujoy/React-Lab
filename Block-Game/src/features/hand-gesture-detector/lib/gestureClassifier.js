@@ -1,7 +1,6 @@
 import { distance } from "./geometry";
 
 // Everything the UI needs to know about each gesture lives here.
-// Add/remove a gesture by editing this object + classifyGesture() below.
 export const GESTURES = {
     open_palm: { label: "Open Palm", action: "Idle" },
     pinch: { label: "Pinch", action: "Draw" },
@@ -13,24 +12,19 @@ export const GESTURES = {
     none: { label: "No hand detected", action: "-" },
 };
 
-export const PINCH_HOLD_MS = 500; // how long a pinch must be held to count as "pinch_hold"
+export const PINCH_HOLD_MS = 500;
 
-// A finger is "extended" if its tip is meaningfully farther from the wrist
-// than its middle joint is. Simple, fast heuristic — works well when the
-// palm faces the camera.
 function getExtendedFingers(landmarks) {
     const wrist = landmarks[0];
 
     const isExtended = (tipIdx, midJointIdx) =>
         distance(landmarks[tipIdx], wrist) >
-        distance(landmarks[midJointIdx], wrist) * 1.15;
+        distance(landmarks[midJointIdx], wrist) * 1.12;
 
-    // Thumb doesn't fold toward the wrist the same way, so we measure it
-    // against the base of the pinky instead.
     const pinkyBase = landmarks[17];
     const thumbExtended =
         distance(landmarks[4], pinkyBase) >
-        distance(landmarks[3], pinkyBase) * 1.05;
+        distance(landmarks[3], pinkyBase) * 1.08;
 
     return {
         thumb: thumbExtended,
@@ -41,47 +35,78 @@ function getExtendedFingers(landmarks) {
     };
 }
 
-// Turns raw landmark positions into one of our named gestures.
-// `pinchTracker` carries the pinch-start timestamp across calls so we can
-// detect "pinch held for 500ms" vs. a quick pinch.
 export function classifyGesture(landmarks, pinchTracker) {
-    const handSize = distance(landmarks[0], landmarks[9]); // wrist -> middle knuckle
-    const pinchDistance = distance(landmarks[4], landmarks[8]); // thumb tip -> index tip
-    const isPinching = pinchDistance < handSize * 0.32;
+    if (!landmarks || landmarks.length < 21) {
+        return "none";
+    }
+
+    // 1. PINCH DETECTION
+    const handSize = distance(landmarks[0], landmarks[9]);
+    const pinchDistance = distance(landmarks[4], landmarks[8]);
+    const isPinching = pinchDistance < handSize * 0.35;
 
     if (isPinching) {
-        if (pinchTracker.startedAt === null)
+        if (pinchTracker.startedAt === null) {
             pinchTracker.startedAt = Date.now();
+        }
         const heldFor = Date.now() - pinchTracker.startedAt;
         return heldFor >= PINCH_HOLD_MS ? "pinch_hold" : "pinch";
     }
-    pinchTracker.startedAt = null; // reset once the pinch releases
+    pinchTracker.startedAt = null;
 
     const { thumb, index, middle, ring, pinky } = getExtendedFingers(landmarks);
-    
-    // Fist: all fingers folded (including thumb, or at most thumb barely extended but not in thumbs up position)
-    const extendedCountNonThumb = [index, middle, ring, pinky].filter(Boolean).length;
-    if (extendedCountNonThumb === 0 && !thumb) {
-        return "fist";
+    const extendedCountNonThumb = [index, middle, ring, pinky].filter(
+        Boolean,
+    ).length;
+    const totalExtended = extendedCountNonThumb + (thumb ? 1 : 0);
+
+    // 2. FIST DETECTION
+    if (extendedCountNonThumb === 0) {
+        if (!thumb || distance(landmarks[4], landmarks[9]) < handSize * 0.65) {
+            return "fist";
+        }
     }
 
-    // Thumbs Up / Thumbs Down: only thumb extended
+    // 3. THUMBS UP / THUMBS DOWN (Sensitivity Fix Applied Here)
     if (thumb && extendedCountNonThumb === 0) {
-        // In MediaPipe space, Y increases downwards, so lower Y means higher up
-        // Compare thumb tip (4) with the thumb base IP joint (2)
-        return landmarks[4].y < landmarks[2].y ? "thumbs_up" : "thumbs_down";
+        // Find the average height (Y) of the main knuckles to establish a baseline for the palm
+        const knuckleRowY =
+            (landmarks[5].y +
+                landmarks[9].y +
+                landmarks[13].y +
+                landmarks[17].y) /
+            4;
+
+        // Remember: MediaPipe Y increases DOWNWARDS. Higher Y value = lower on screen.
+
+        // THUMBS UP: Thumb tip must be noticeably HIGHER (lesser Y) than the knuckle row
+        if (
+            landmarks[4].y < knuckleRowY - 0.05 &&
+            landmarks[4].y < landmarks[2].y
+        ) {
+            return "thumbs_up";
+        }
+
+        // THUMBS DOWN: Thumb tip must be noticeably LOWER (greater Y) than the knuckle row
+        if (
+            landmarks[4].y > knuckleRowY + 0.05 &&
+            landmarks[4].y > landmarks[2].y
+        ) {
+            return "thumbs_down";
+        }
+
+        // If the thumb is extended out to the side but not clearly up or down, it falls through
     }
 
-    // Victory (Peace): index and middle fingers extended, ring and pinky folded
-    if (index && middle && !ring && !pinky) {
+    // 4. VICTORY (Peace)
+    if (index && middle && !ring && extendedCountNonThumb <= 2) {
         return "peace";
     }
 
-    // Open Palm: 4 or 5 fingers extended
-    const totalExtended = [thumb, index, middle, ring, pinky].filter(Boolean).length;
+    // 5. OPEN PALM
     if (totalExtended >= 4) {
         return "open_palm";
     }
 
-    return "open_palm"; // Default to Idle
+    return "none";
 }
