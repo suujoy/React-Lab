@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import "@mediapipe/hands";
-import "@mediapipe/camera_utils";
+
 import { getCoverRect, landmarkToCanvasPoint } from "../lib/geometry";
 import { drawHandSkeleton } from "../components/HandCanvasOverlay";
 import {
@@ -10,7 +9,8 @@ import {
 } from "../lib/handStateTracker";
 
 // MediaPipe attaches these to the global scope once the scripts above load.
-const { Hands, HAND_CONNECTIONS, Camera } = globalThis;
+import { Hands, HAND_CONNECTIONS } from "@mediapipe/hands";
+import { Camera } from "@mediapipe/camera_utils";
 
 const PROCESS_EVERY_N_FRAMES = 2; // skip frames to save CPU (classify every 2nd frame)
 
@@ -43,9 +43,15 @@ export function useHandTracking({ onPinchHold, onFist } = {}) {
     const [isRunning, setIsRunning] = useState(false);
     const [statusText, setStatusText] = useState("Camera off");
     const [gestureIds, setGestureIds] = useState(["none", "none"]);
-    const [handPositions, setHandPositions] = useState([{ x: 0, y: 0 }, { x: 0, y: 0 }]);
+    const [handPositions, setHandPositions] = useState([
+        { x: 0, y: 0 },
+        { x: 0, y: 0 },
+    ]);
 
-    const smoothedPositionsRef = useRef([{ x: 0, y: 0 }, { x: 0, y: 0 }]);
+    const smoothedPositionsRef = useRef([
+        { x: 0, y: 0 },
+        { x: 0, y: 0 },
+    ]);
 
     // Called by MediaPipe on every processed video frame.
     const handleResults = (results) => {
@@ -73,7 +79,10 @@ export function useHandTracking({ onPinchHold, onFist } = {}) {
 
         const detectedHands = results.multiHandLandmarks?.slice(0, 2) || [];
         const nextGestureIds = ["none", "none"];
-        const nextHandPositions = [{ x: 0, y: 0 }, { x: 0, y: 0 }];
+        const nextHandPositions = [
+            { x: 0, y: 0 },
+            { x: 0, y: 0 },
+        ];
 
         // Update up to 2 hand slots. Slots with no detected hand this frame
         // just tick their "missing" counter instead of drawing anything.
@@ -105,10 +114,15 @@ export function useHandTracking({ onPinchHold, onFist } = {}) {
                 };
 
                 // Use index tip for general aiming, and pinchMidpoint when pinching/building
-                const isPinching = handState.stableGesture === "pinch" || handState.stableGesture === "pinch_hold";
+                const isPinching =
+                    handState.stableGesture === "pinch" ||
+                    handState.stableGesture === "pinch_hold";
                 const activePointer = isPinching ? pinchMidpoint : indexTip;
 
-                const canvasPoint = landmarkToCanvasPoint(activePointer, coverRect);
+                const canvasPoint = landmarkToCanvasPoint(
+                    activePointer,
+                    coverRect,
+                );
                 const rawNdcX = (canvasPoint.x / canvas.width) * 2 - 1;
                 const rawNdcY = -((canvasPoint.y / canvas.height) * 2 - 1);
 
@@ -117,8 +131,12 @@ export function useHandTracking({ onPinchHold, onFist } = {}) {
                 const prevPos = smoothedPositionsRef.current[slot];
                 const isFirstDetected = prevPos.x === 0 && prevPos.y === 0;
 
-                const ndcX = isFirstDetected ? rawNdcX : alpha * rawNdcX + (1 - alpha) * prevPos.x;
-                const ndcY = isFirstDetected ? rawNdcY : alpha * rawNdcY + (1 - alpha) * prevPos.y;
+                const ndcX = isFirstDetected
+                    ? rawNdcX
+                    : alpha * rawNdcX + (1 - alpha) * prevPos.x;
+                const ndcY = isFirstDetected
+                    ? rawNdcY
+                    : alpha * rawNdcY + (1 - alpha) * prevPos.y;
 
                 smoothedPositionsRef.current[slot] = { x: ndcX, y: ndcY };
                 nextHandPositions[slot] = { x: ndcX, y: ndcY };
@@ -250,3 +268,8 @@ export function useHandTracking({ onPinchHold, onFist } = {}) {
         stopCamera,
     };
 }
+console.log({
+    Hands,
+    Camera,
+    HAND_CONNECTIONS,
+});
