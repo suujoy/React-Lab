@@ -1,13 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import "@mediapipe/hands";
 import "@mediapipe/camera_utils";
+import { getCoverRect, landmarkToCanvasPoint } from "../lib/geometry";
 import { drawHandSkeleton } from "../components/HandCanvasOverlay";
 import {
     createHandState,
     updateHandStateWithGesture,
     updateHandStateAsMissing,
 } from "../lib/handStateTracker";
-import { getCoverRect } from "../lib/geometry";
 
 // MediaPipe attaches these to the global scope once the scripts above load.
 const { Hands, HAND_CONNECTIONS, Camera } = globalThis;
@@ -17,7 +17,12 @@ const PROCESS_EVERY_N_FRAMES = 2; // skip frames to save CPU (classify every 2nd
 // Owns every imperative/lifecycle piece: MediaPipe setup, the camera object,
 // per-frame classification, and canvas drawing. Everything else in the app
 // stays declarative and just consumes the returned refs + state.
-export function useHandTracking() {
+//
+// onPinchHold(ndcX, ndcY) and onFist() are optional callbacks, fired once
+// per gesture transition (not every frame it's held) — e.g. to place or
+// remove a block in a 3D scene. ndcX/ndcY are normalized device coords
+// in [-1, 1], suitable for Three.js unprojection.
+export function useHandTracking({ onPinchHold, onFist } = {}) {
     const videoRef = useRef(null);
     const canvasRef = useRef(null);
     const handsRef = useRef(null);
@@ -27,6 +32,14 @@ export function useHandTracking() {
 
     // Fixed-size array: index 0 = first detected hand, index 1 = second hand.
     const handStatesRef = useRef([createHandState(), createHandState()]);
+    // Previous frame's stable gesture per hand, used to fire callbacks only
+    // on the transition into a gesture rather than on every frame it's held.
+    const previousStableRef = useRef(["none", "none"]);
+    // Latest callbacks, kept in a ref so handleResults doesn't need to be
+    // recreated (and MediaPipe re-wired) whenever the caller passes new
+    // inline function props.
+    const callbacksRef = useRef({ onPinchHold, onFist });
+    callbacksRef.current = { onPinchHold, onFist };
 
     const [isRunning, setIsRunning] = useState(false);
     const [statusText, setStatusText] = useState("Camera off");
@@ -84,7 +97,45 @@ export function useHandTracking() {
             }
 
             nextGestureIds[slot] = handState.stableGesture;
+
+            // Fire callbacks only on the transition INTO a gesture, not every
+            // frame it's held — otherwise pinch_hold would re-place the block
+            // dozens of times per second.
+            const justEntered = (gesture) =>
+                nextGestureIds[slot] === gesture &&
+                previousStableRef.current[slot] !== gesture;
+
+            if (
+                landmarks &&
+                justEntered("pinch_hold") &&
+                callbacksRef.current.onPinchHold
+            ) {
+                // Pinch point = midpoint between thumb tip (landmark 4) and index
+                // tip (landmark 8), converted from video-normalized space to
+                // canvas pixels, then to Three.js normalized device coordinates
+                // (x and y each in [-1, 1], with y flipped since canvas Y grows
+                // downward but NDC Y grows upward).
+                const thumbTip = landmarks[4];
+                const indexTip = landmarks[8];
+                const pinchMidpoint = {
+                    x: (thumbTip.x + indexTip.x) / 2,
+                    y: (thumbTip.y + indexTip.y) / 2,
+                };
+                const canvasPoint = landmarkToCanvasPoint(
+                    pinchMidpoint,
+                    coverRect,
+                );
+                const ndcX = (canvasPoint.x / canvas.width) * 2 - 1;
+                const ndcY = -((canvasPoint.y / canvas.height) * 2 - 1);
+                callbacksRef.current.onPinchHold(ndcX, ndcY);
+            }
+
+            if (justEntered("fist") && callbacksRef.current.onFist) {
+                callbacksRef.current.onFist();
+            }
         }
+
+        previousStableRef.current = nextGestureIds;
 
         setGestureIds((current) =>
             current[0] === nextGestureIds[0] && current[1] === nextGestureIds[1]

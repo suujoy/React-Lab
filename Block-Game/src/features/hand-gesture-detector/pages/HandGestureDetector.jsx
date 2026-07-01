@@ -1,11 +1,18 @@
-import { useHandTracking } from "../hooks/Usehandtracking";
-import HandCanvasOverlay from "../components/HandCanvasOverlay";
-import CameraControls from "../components/CameraControls";
-import GestureStatusPanel from "../components/GestureStatusPanel";
+import { useRef } from "react";
+import { useHandTracking } from "../hooks/UsehandTracking"; 
+import HandCanvasOverlay from "../components/HandCanvasOverlay"; 
+import CameraControls from "../components/CameraControls"; 
+import GestureStatusPanel from "../components/GestureStatusPanel"; 
+import BlockCanvas from "../components/BlockCanvas"; 
 
 // Top-level component: just wiring. All logic lives in useHandTracking();
 // all presentation lives in the child components below.
 export default function HandGestureDetector() {
+    // Imperative handle onto the Three.js block scene — pinch-hold places
+    // the block, fist removes it. Kept as a ref (not state) since it's an
+    // imperative 3D scene, not something that should trigger re-renders.
+    const blockCanvasRef = useRef(null);
+
     const {
         videoRef,
         canvasRef,
@@ -14,7 +21,11 @@ export default function HandGestureDetector() {
         gestureIds,
         startCamera,
         stopCamera,
-    } = useHandTracking();
+    } = useHandTracking({
+        onPinchHold: (ndcX, ndcY) =>
+            blockCanvasRef.current?.placeBlockAt(ndcX, ndcY),
+        onFist: () => blockCanvasRef.current?.removeBlock(),
+    });
 
     return (
         <div className="relative h-screen w-screen overflow-hidden bg-black text-white">
@@ -25,6 +36,8 @@ export default function HandGestureDetector() {
                 muted
                 className="absolute inset-0 h-full w-full object-cover -scale-x-100"
             />
+            {/* The single 3D block, placed/removed by pinch-hold and fist */}
+            <BlockCanvas ref={blockCanvasRef} />
             {/* Skeleton overlay drawn on top of the video */}
             <HandCanvasOverlay ref={canvasRef} />
 
