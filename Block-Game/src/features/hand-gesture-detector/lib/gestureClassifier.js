@@ -4,12 +4,12 @@ import { distance } from "./geometry";
 // Add/remove a gesture by editing this object + classifyGesture() below.
 export const GESTURES = {
     open_palm: { label: "Open Palm", action: "Idle" },
-    pinch: { label: "Pinch", action: "Aim" },
-    pinch_hold: { label: "Pinch Hold", action: "Build" },
-    fist: { label: "Fist", action: "Delete" },
-    peace: { label: "Victory", action: "Confirm" },
-    thumbs_up: { label: "Thumbs Up", action: "Accept" },
-    thumbs_down: { label: "Thumbs Down", action: "Cancel" },
+    pinch: { label: "Pinch", action: "Draw" },
+    pinch_hold: { label: "Pinch Hold", action: "Draw" },
+    fist: { label: "Fist", action: "Erase" },
+    peace: { label: "Victory", action: "Undo" },
+    thumbs_up: { label: "Thumbs Up", action: "Save" },
+    thumbs_down: { label: "Thumbs Down", action: "Clear" },
     none: { label: "No hand detected", action: "-" },
 };
 

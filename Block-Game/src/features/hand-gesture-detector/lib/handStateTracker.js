@@ -48,4 +48,4 @@ export function updateHandStateAsMissing(handState, shouldClassify) {
     handState.candidateStreak = 0;
     handState.stableGesture = "none";
   }
-}1
+}

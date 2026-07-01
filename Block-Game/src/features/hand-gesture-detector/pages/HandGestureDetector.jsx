@@ -1,31 +1,42 @@
-import React, { useRef, useState, useEffect } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useHandTracking } from "../hooks/UsehandTracking";
 import HandCanvasOverlay from "../components/HandCanvasOverlay";
 import GestureHelpPanel from "../components/GestureHelpPanel";
 import ControlDock from "../components/ControlDock";
-import VoxelGridCanvas from "../components/VoxelGridCanvas";
+import AirCanvas, { COLOR_MAP, BRUSH_SIZES, ERASER_RADIUS } from "../components/AirCanvas";
 import { TelemetryHUD, CameraStatusPill } from "../components/ARStatusBar";
 
+const STORAGE_KEY = "air_draw_strokes";
+
 export default function HandGestureDetector() {
-    const [blocks, setBlocks] = useState([]);
+    const [strokes, setStrokes] = useState([]);
     const [activeColor, setActiveColor] = useState("pink");
-    const [saveMessage, setSaveMessage] = useState("");
-    const [hoveredCell, setHoveredCell] = useState(null);
+    const [brushSize, setBrushSize] = useState(BRUSH_SIZES.m);
+    const [toast, setToast] = useState("");
+    const [cursor, setCursor] = useState({ point: null, tool: "idle" });
     const [isPanelCollapsed, setIsPanelCollapsed] = useState(false);
 
-    // Load initial blocks if saved
+    const toastTimeoutRef = useRef(null);
+    const showToast = (message) => {
+        setToast(message);
+        clearTimeout(toastTimeoutRef.current);
+        toastTimeoutRef.current = setTimeout(() => setToast(""), 2200);
+    };
+
+    // Load any drawing saved from a previous session.
     useEffect(() => {
-        const saved = localStorage.getItem("air_blocks");
+        const saved = localStorage.getItem(STORAGE_KEY);
         if (saved) {
             try {
-                setBlocks(JSON.parse(saved));
+                setStrokes(JSON.parse(saved));
             } catch (e) {
-                console.error("Failed to parse saved blocks", e);
+                console.error("Failed to parse saved drawing", e);
             }
         }
+        return () => clearTimeout(toastTimeoutRef.current);
     }, []);
 
-    // Collapse gesture panel on small screens by default
+    // Collapse the gesture panel on small screens by default.
     useEffect(() => {
         const mql = window.matchMedia("(max-width: 640px)");
         if (mql.matches) setIsPanelCollapsed(true);
@@ -47,75 +58,34 @@ export default function HandGestureDetector() {
         stopCamera,
     } = useHandTracking();
 
-    // Map active color keys to colors
-    const COLOR_MAP = {
-        pink: "#ff1493",
-        cyan: "#00f0ff",
-        purple: "#bd00ff",
-        orange: "#ff8c00",
-    };
-
-    const handleAddBlock = (position) => {
-        setBlocks((current) => {
-            const exists = current.some(
-                (b) =>
-                    b.position[0] === position[0] &&
-                    b.position[1] === position[1] &&
-                    b.position[2] === position[2]
-            );
-            if (exists) return current;
-
-            return [
-                ...current,
-                {
-                    id: `${position[0]}_${position[1]}_${position[2]}_${Date.now()}`,
-                    position,
-                    color: COLOR_MAP[activeColor],
-                },
-            ];
-        });
-    };
-
-    const handleRemoveBlock = (position) => {
-        setBlocks((current) =>
-            current.filter(
-                (b) =>
-                    !(
-                        b.position[0] === position[0] &&
-                        b.position[1] === position[1] &&
-                        b.position[2] === position[2]
-                    )
-            )
-        );
+    const handleAddStroke = (stroke) => {
+        setStrokes((current) => [...current, stroke]);
     };
 
     const handleUndo = () => {
-        setBlocks((current) => current.slice(0, -1));
+        setStrokes((current) => current.slice(0, -1));
     };
 
     const handleClear = () => {
-        setBlocks([]);
+        setStrokes([]);
     };
 
     const handleSave = () => {
-        localStorage.setItem("air_blocks", JSON.stringify(blocks));
-        setSaveMessage("AR Model Saved!");
-        setTimeout(() => setSaveMessage(""), 2500);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(strokes));
+        showToast("Drawing Saved!");
     };
 
     const handleLoad = () => {
-        const saved = localStorage.getItem("air_blocks");
+        const saved = localStorage.getItem(STORAGE_KEY);
         if (saved) {
             try {
-                setBlocks(JSON.parse(saved));
-                setSaveMessage("AR Model Loaded!");
-                setTimeout(() => setSaveMessage(""), 2500);
+                setStrokes(JSON.parse(saved));
+                showToast("Drawing Loaded!");
             } catch (e) {
                 console.error(e);
             }
         } else {
-            setSaveMessage("No saved model found.");
-            setTimeout(() => setSaveMessage(""), 2500);
+            showToast("No saved drawing found.");
         }
     };
 
@@ -127,9 +97,43 @@ export default function HandGestureDetector() {
         }
     };
 
-    // Designated primary hand for building actions (hand 0)
+    // Designated primary hand for drawing actions (hand 0).
     const activeGesture = gestureIds[0] || "none";
     const activeHandNDC = handPositions[0] || { x: 0, y: 0 };
+
+    // Gesture shortcuts: fire once per transition into the gesture, not
+    // every frame it's held — mirrors the debouncing already done inside
+    // useHandTracking for gesture stability.
+    const previousGestureRef = useRef("none");
+    useEffect(() => {
+        const enteredGesture =
+            activeGesture !== previousGestureRef.current ? activeGesture : null;
+        previousGestureRef.current = activeGesture;
+        if (!enteredGesture) return;
+
+        if (enteredGesture === "peace") {
+            setStrokes((current) => {
+                if (current.length === 0) return current;
+                showToast("Stroke Undone");
+                return current.slice(0, -1);
+            });
+        } else if (enteredGesture === "thumbs_up") {
+            showToast("Drawing Saved!");
+            setStrokes((current) => {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(current));
+                return current;
+            });
+        } else if (enteredGesture === "thumbs_down") {
+            setStrokes((current) => {
+                if (current.length === 0) return current;
+                showToast("Drawing Cleared");
+                return [];
+            });
+        }
+    }, [activeGesture]);
+
+    const cursorColor =
+        cursor.tool === "eraser" ? "#ff4d6d" : COLOR_MAP[activeColor] ?? COLOR_MAP.pink;
 
     return (
         <div
@@ -182,50 +186,56 @@ export default function HandGestureDetector() {
                 <HandCanvasOverlay ref={canvasRef} />
             </div>
 
-            {/* ── Layer 20: Three.js voxel scene (transparent bg) ───────────── */}
-            <div className="absolute inset-0 pointer-events-auto" style={{ zIndex: 20 }}>
-                <VoxelGridCanvas
-                    blocks={blocks}
-                    onAddBlock={handleAddBlock}
-                    onRemoveBlock={handleRemoveBlock}
+            {/* ── Layer 20: Flat air-draw canvas (transparent bg) ────────────── */}
+            <div className="absolute inset-0 pointer-events-none" style={{ zIndex: 20 }}>
+                <AirCanvas
+                    strokes={strokes}
+                    onAddStroke={handleAddStroke}
                     activeColor={activeColor}
+                    brushSize={brushSize}
                     handNDC={activeHandNDC}
                     activeGesture={activeGesture}
-                    onTargetCellChange={setHoveredCell}
+                    onCursorChange={(point, tool) => setCursor({ point, tool })}
                 />
             </div>
+
+            {/* ── Layer 25: Live cursor reticle ───────────────────────────────── */}
+            {cursor.point && (
+                <div
+                    className="pointer-events-none absolute"
+                    style={{
+                        zIndex: 25,
+                        left: cursor.point.x,
+                        top: cursor.point.y,
+                        transform: "translate(-50%, -50%)",
+                        width: cursor.tool === "eraser" ? ERASER_RADIUS * 2 : Math.max(16, brushSize * 2.2),
+                        height: cursor.tool === "eraser" ? ERASER_RADIUS * 2 : Math.max(16, brushSize * 2.2),
+                        borderRadius: "50%",
+                        border: `2px solid ${cursorColor}`,
+                        boxShadow: `0 0 12px ${cursorColor}, 0 0 24px ${cursorColor}80`,
+                        background:
+                            cursor.tool === "pen" ? `${cursorColor}33` : "transparent",
+                        transition: "width 0.15s ease, height 0.15s ease",
+                    }}
+                />
+            )}
 
             {/* ── Layer 30: Floating HUD panels ────────────────────────────── */}
 
-            {/* Top-left: AR Telemetry */}
-            <div
-                className="absolute pointer-events-none"
-                style={{ top: 16, left: 16, zIndex: 30 }}
-            >
-                <TelemetryHUD
-                    hoveredCell={hoveredCell}
-                    blocks={blocks.length}
-                    statusText={statusText}
-                />
+            {/* Top-left: telemetry */}
+            <div className="absolute pointer-events-none" style={{ top: 16, left: 16, zIndex: 30 }}>
+                <TelemetryHUD cursor={cursor} strokeCount={strokes.length} statusText={statusText} />
             </div>
 
             {/* Top-right: Camera status */}
-            <div
-                className="absolute pointer-events-none"
-                style={{ top: 16, right: 16, zIndex: 30 }}
-            >
+            <div className="absolute pointer-events-none" style={{ top: 16, right: 16, zIndex: 30 }}>
                 <CameraStatusPill isRunning={isRunning} />
             </div>
 
             {/* Left-center: Gesture Command Deck (vertically centered) */}
             <div
                 className="absolute pointer-events-auto"
-                style={{
-                    left: 16,
-                    top: "50%",
-                    transform: "translateY(-50%)",
-                    zIndex: 30,
-                }}
+                style={{ left: 16, top: "50%", transform: "translateY(-50%)", zIndex: 30 }}
             >
                 <GestureHelpPanel
                     activeGesture={activeGesture}
@@ -237,29 +247,25 @@ export default function HandGestureDetector() {
             {/* Bottom-center: Control Dock */}
             <div
                 className="absolute pointer-events-auto"
-                style={{
-                    bottom: 20,
-                    left: "50%",
-                    transform: "translateX(-50%)",
-                    zIndex: 30,
-                }}
+                style={{ bottom: 20, left: "50%", transform: "translateX(-50%)", zIndex: 30 }}
             >
                 <ControlDock
                     activeColor={activeColor}
                     onChangeColor={setActiveColor}
+                    brushSize={brushSize}
+                    onChangeBrushSize={setBrushSize}
                     onUndo={handleUndo}
                     onClear={handleClear}
                     onSave={handleSave}
                     onLoad={handleLoad}
-                    voxelCount={blocks.length}
+                    strokeCount={strokes.length}
                     isCameraRunning={isRunning}
                     onToggleCamera={handleToggleCamera}
-                    statusText={statusText}
                 />
             </div>
 
             {/* ── Layer 40: Toast notification ──────────────────────────────── */}
-            {saveMessage && (
+            {toast && (
                 <div
                     className="absolute pointer-events-none"
                     style={{
@@ -275,6 +281,7 @@ export default function HandGestureDetector() {
                         boxShadow: "0 0 24px rgba(255,20,147,0.45), 0 4px 20px rgba(0,0,0,0.5)",
                         whiteSpace: "nowrap",
                         animation: "slide-down 0.25s ease forwards",
+                        transform: "translateX(-50%)",
                     }}
                 >
                     <span
@@ -287,7 +294,7 @@ export default function HandGestureDetector() {
                             letterSpacing: "0.14em",
                         }}
                     >
-                        ✦ {saveMessage}
+                        ✦ {toast}
                     </span>
                 </div>
             )}

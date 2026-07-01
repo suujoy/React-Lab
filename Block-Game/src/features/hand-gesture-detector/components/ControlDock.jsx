@@ -1,9 +1,8 @@
 import React from "react";
 import { Undo2, Trash2, Save, FolderOpen, Camera, CameraOff } from "lucide-react";
-import { COLOR_MAP } from "./VoxelGridCanvas";
+import { COLOR_MAP, BRUSH_SIZES } from "./AirCanvas";
 
 const monoStyle = { fontFamily: "'Space Mono', monospace" };
-const soraStyle = { fontFamily: "'Sora', sans-serif" };
 
 // Glass button base
 const btnBase = {
@@ -54,14 +53,15 @@ function GlassBtn({ onClick, disabled, title, children, style = {} }) {
 export default function ControlDock({
     activeColor,
     onChangeColor,
+    brushSize,
+    onChangeBrushSize,
     onUndo,
     onClear,
     onSave,
     onLoad,
-    voxelCount,
+    strokeCount,
     isCameraRunning,
     onToggleCamera,
-    statusText,
 }) {
     return (
         <div
@@ -80,7 +80,7 @@ export default function ControlDock({
             }}
         >
             {/* Color swatches */}
-            <div className="flex items-center gap-1.5" title="Voxel Color">
+            <div className="flex items-center gap-1.5" title="Ink Color">
                 {Object.entries(COLOR_MAP).map(([name, hex]) => {
                     const isSelected = activeColor === name;
                     return (
@@ -121,16 +121,50 @@ export default function ControlDock({
             {/* Divider */}
             <div style={{ width: 1, height: 24, background: "rgba(255,255,255,0.08)", flexShrink: 0 }} />
 
+            {/* Brush size */}
+            <div className="flex items-center gap-1" title="Brush Size">
+                {Object.entries(BRUSH_SIZES).map(([key, size]) => {
+                    const isSelected = brushSize === size;
+                    return (
+                        <button
+                            key={key}
+                            onClick={() => onChangeBrushSize(size)}
+                            title={`Brush: ${key.toUpperCase()}`}
+                            style={{
+                                ...btnBase,
+                                width: 24,
+                                height: 24,
+                                background: isSelected ? "rgba(255,20,147,0.22)" : "rgba(255,20,147,0.06)",
+                                borderColor: isSelected ? "rgba(255,20,147,0.7)" : "rgba(255,20,147,0.2)",
+                                boxShadow: isSelected ? "0 0 8px rgba(255,20,147,0.35)" : "none",
+                            }}
+                        >
+                            <span
+                                style={{
+                                    width: Math.min(size, 12),
+                                    height: Math.min(size, 12),
+                                    borderRadius: "50%",
+                                    background: isSelected ? "#ff1493" : "#ffb0ca",
+                                }}
+                            />
+                        </button>
+                    );
+                })}
+            </div>
+
+            {/* Divider */}
+            <div style={{ width: 1, height: 24, background: "rgba(255,255,255,0.08)", flexShrink: 0 }} />
+
             {/* Undo */}
-            <GlassBtn onClick={onUndo} disabled={voxelCount === 0} title="Undo Last Placement">
+            <GlassBtn onClick={onUndo} disabled={strokeCount === 0} title="Undo Last Stroke">
                 <Undo2 style={{ width: 13, height: 13 }} />
             </GlassBtn>
 
             {/* Clear */}
             <GlassBtn
                 onClick={onClear}
-                disabled={voxelCount === 0}
-                title="Clear Workspace"
+                disabled={strokeCount === 0}
+                title="Clear Drawing"
             >
                 <Trash2 style={{ width: 13, height: 13 }} />
             </GlassBtn>
@@ -141,18 +175,18 @@ export default function ControlDock({
             {/* Save */}
             <button
                 onClick={onSave}
-                disabled={voxelCount === 0}
+                disabled={strokeCount === 0}
                 title="Save to Storage"
                 style={{
                     ...btnBase,
                     height: 32,
                     padding: "0 10px",
                     gap: 5,
-                    opacity: voxelCount === 0 ? 0.35 : 1,
-                    cursor: voxelCount === 0 ? "not-allowed" : "pointer",
+                    opacity: strokeCount === 0 ? 0.35 : 1,
+                    cursor: strokeCount === 0 ? "not-allowed" : "pointer",
                 }}
                 onMouseEnter={(e) => {
-                    if (voxelCount > 0) {
+                    if (strokeCount > 0) {
                         e.currentTarget.style.background = "rgba(255,20,147,0.18)";
                         e.currentTarget.style.borderColor = "rgba(255,20,147,0.6)";
                         e.currentTarget.style.boxShadow = "0 0 8px rgba(255,20,147,0.3)";

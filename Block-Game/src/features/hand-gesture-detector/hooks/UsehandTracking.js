@@ -19,9 +19,8 @@ const PROCESS_EVERY_N_FRAMES = 2; // skip frames to save CPU (classify every 2nd
 // stays declarative and just consumes the returned refs + state.
 //
 // onPinchHold(ndcX, ndcY) and onFist() are optional callbacks, fired once
-// per gesture transition (not every frame it's held) — e.g. to place or
-// remove a block in a 3D scene. ndcX/ndcY are normalized device coords
-// in [-1, 1], suitable for Three.js unprojection.
+// per gesture transition (not every frame it's held) — e.g. to draw or
+// erase on a canvas. ndcX/ndcY are normalized device coords in [-1, 1].
 export function useHandTracking({ onPinchHold, onFist } = {}) {
     const videoRef = useRef(null);
     const canvasRef = useRef(null);

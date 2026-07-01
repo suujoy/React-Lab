@@ -1,16 +1,34 @@
-# React + Vite
+# Air Draw
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A hand-gesture drawing app. Point your webcam at yourself, pinch your thumb
+and index finger together, and draw in the air — the stroke shows up as a
+glowing neon line on a flat, full-screen canvas over your camera feed. No 3D,
+no grid — just a flat surface you draw on with your fingertip.
 
-Currently, two official plugins are available:
+## Gestures
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+| Gesture        | Action              |
+| -------------- | ------------------- |
+| Open Palm      | Idle (pen up)        |
+| Pinch          | Draw                 |
+| Fist           | Erase                |
+| Peace ✌️       | Undo last stroke     |
+| Thumbs Up 👍   | Save drawing         |
+| Thumbs Down 👎 | Clear the canvas     |
 
-## React Compiler
+## Stack
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- React 19 + Vite
+- MediaPipe Hands for hand tracking (2 hands, 21 landmarks each)
+- Plain 2D Canvas for drawing — no WebGL/Three.js
+- Tailwind v4 for the HUD chrome
 
-## Expanding the ESLint configuration
+## Running it
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+```bash
+npm install
+npm run dev
+```
+
+Grant camera access when prompted, then hit **Start** in the control dock at
+the bottom of the screen.

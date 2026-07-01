@@ -239,7 +239,7 @@ export default function GestureHelpPanel({
                             letterSpacing: "0.04em",
                         }}
                     >
-                        Hold Pinch 0.7s {"->"} controlled build
+                        Pinch to draw {"->"} release to lift the pen
                     </span>
                 </div>
             )}

@@ -20,15 +20,17 @@ const monoStyle = {
     fontFamily: "'Space Mono', monospace",
 };
 
-const soraStyle = {
-    fontFamily: "'Sora', sans-serif",
-};
-
 // ── Top-left telemetry chip ──────────────────────────────────────────────────
-export function TelemetryHUD({ hoveredCell, blocks, statusText }) {
-    const xyz = hoveredCell
-        ? `${hoveredCell[0]}, ${hoveredCell[1]}, ${hoveredCell[2]}`
-        : "---, ---, ---";
+export function TelemetryHUD({ cursor, strokeCount, statusText }) {
+    const point = cursor?.point;
+    const ptr = point
+        ? `${Math.round(point.x)}, ${Math.round(point.y)}`
+        : "---, ---";
+    const tool = cursor?.tool && cursor.tool !== "idle"
+        ? cursor.tool.toUpperCase()
+        : point
+            ? "IDLE"
+            : "NONE";
 
     return (
         <div style={{ ...glassStyle, minWidth: 0 }}>
@@ -48,29 +50,39 @@ export function TelemetryHUD({ hoveredCell, blocks, statusText }) {
                         fontWeight: 700,
                     }}
                 >
-                    AR Telemetry
+                    Air Telemetry
                 </span>
             </div>
 
             {/* Data rows */}
             <div className="flex flex-col gap-0.5 px-3 py-2">
-                {/* XYZ */}
+                {/* Pointer position */}
                 <div className="flex items-center gap-2">
                     <span style={{ ...monoStyle, fontSize: 8, color: "#555", textTransform: "uppercase", letterSpacing: "0.08em", width: 28 }}>
-                        XYZ
+                        PTR
                     </span>
                     <span style={{ ...monoStyle, fontSize: 10, color: "#00f0ff", fontWeight: 700, letterSpacing: "0.03em" }}>
-                        {xyz}
+                        {ptr}
                     </span>
                 </div>
 
-                {/* Blocks */}
+                {/* Active tool */}
                 <div className="flex items-center gap-2">
                     <span style={{ ...monoStyle, fontSize: 8, color: "#555", textTransform: "uppercase", letterSpacing: "0.08em", width: 28 }}>
-                        BLK
+                        TOOL
+                    </span>
+                    <span style={{ ...monoStyle, fontSize: 10, color: tool === "PEN" ? "#ff1493" : tool === "ERASER" ? "#ff4d6d" : "#7a8a98", fontWeight: 700 }}>
+                        {tool}
+                    </span>
+                </div>
+
+                {/* Strokes */}
+                <div className="flex items-center gap-2">
+                    <span style={{ ...monoStyle, fontSize: 8, color: "#555", textTransform: "uppercase", letterSpacing: "0.08em", width: 28 }}>
+                        INK
                     </span>
                     <span style={{ ...monoStyle, fontSize: 10, color: "#ff1493", fontWeight: 700 }}>
-                        {blocks}
+                        {strokeCount}
                     </span>
                 </div>
 
