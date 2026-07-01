@@ -44,6 +44,9 @@ export function useHandTracking({ onPinchHold, onFist } = {}) {
     const [isRunning, setIsRunning] = useState(false);
     const [statusText, setStatusText] = useState("Camera off");
     const [gestureIds, setGestureIds] = useState(["none", "none"]);
+    const [handPositions, setHandPositions] = useState([{ x: 0, y: 0 }, { x: 0, y: 0 }]);
+
+    const smoothedPositionsRef = useRef([{ x: 0, y: 0 }, { x: 0, y: 0 }]);
 
     // Called by MediaPipe on every processed video frame.
     const handleResults = (results) => {
@@ -71,6 +74,7 @@ export function useHandTracking({ onPinchHold, onFist } = {}) {
 
         const detectedHands = results.multiHandLandmarks?.slice(0, 2) || [];
         const nextGestureIds = ["none", "none"];
+        const nextHandPositions = [{ x: 0, y: 0 }, { x: 0, y: 0 }];
 
         // Update up to 2 hand slots. Slots with no detected hand this frame
         // just tick their "missing" counter instead of drawing anything.
@@ -84,23 +88,50 @@ export function useHandTracking({ onPinchHold, onFist } = {}) {
                     landmarks,
                     coverRect,
                     HAND_CONNECTIONS,
-                    slot === 0 ? "#ffb020" : "#22c55e",
-                    slot === 0 ? "#ffffff" : "#93c5fd",
+                    slot === 0 ? "#ff1493" : "#00f0ff", // Pink for primary hand, Cyan for secondary hand
+                    slot === 0 ? "#ffffff" : "#ffffff",
                 );
                 updateHandStateWithGesture(
                     handState,
                     landmarks,
                     shouldClassify,
                 );
+
+                // Pinch point = midpoint between thumb tip (4) and index tip (8)
+                const thumbTip = landmarks[4];
+                const indexTip = landmarks[8];
+                const pinchMidpoint = {
+                    x: (thumbTip.x + indexTip.x) / 2,
+                    y: (thumbTip.y + indexTip.y) / 2,
+                };
+
+                // Use index tip for general aiming, and pinchMidpoint when pinching/building
+                const isPinching = handState.stableGesture === "pinch" || handState.stableGesture === "pinch_hold";
+                const activePointer = isPinching ? pinchMidpoint : indexTip;
+
+                const canvasPoint = landmarkToCanvasPoint(activePointer, coverRect);
+                const rawNdcX = (canvasPoint.x / canvas.width) * 2 - 1;
+                const rawNdcY = -((canvasPoint.y / canvas.height) * 2 - 1);
+
+                // Exponential smoothing (alpha = 0.25 for a good balance of responsiveness and stability)
+                const alpha = 0.25;
+                const prevPos = smoothedPositionsRef.current[slot];
+                const isFirstDetected = prevPos.x === 0 && prevPos.y === 0;
+
+                const ndcX = isFirstDetected ? rawNdcX : alpha * rawNdcX + (1 - alpha) * prevPos.x;
+                const ndcY = isFirstDetected ? rawNdcY : alpha * rawNdcY + (1 - alpha) * prevPos.y;
+
+                smoothedPositionsRef.current[slot] = { x: ndcX, y: ndcY };
+                nextHandPositions[slot] = { x: ndcX, y: ndcY };
             } else {
                 updateHandStateAsMissing(handState, shouldClassify);
+                smoothedPositionsRef.current[slot] = { x: 0, y: 0 };
+                nextHandPositions[slot] = { x: 0, y: 0 };
             }
 
             nextGestureIds[slot] = handState.stableGesture;
 
-            // Fire callbacks only on the transition INTO a gesture, not every
-            // frame it's held — otherwise pinch_hold would re-place the block
-            // dozens of times per second.
+            // Fire legacy callbacks if needed (for backwards compatibility)
             const justEntered = (gesture) =>
                 nextGestureIds[slot] === gesture &&
                 previousStableRef.current[slot] !== gesture;
@@ -110,24 +141,8 @@ export function useHandTracking({ onPinchHold, onFist } = {}) {
                 justEntered("pinch_hold") &&
                 callbacksRef.current.onPinchHold
             ) {
-                // Pinch point = midpoint between thumb tip (landmark 4) and index
-                // tip (landmark 8), converted from video-normalized space to
-                // canvas pixels, then to Three.js normalized device coordinates
-                // (x and y each in [-1, 1], with y flipped since canvas Y grows
-                // downward but NDC Y grows upward).
-                const thumbTip = landmarks[4];
-                const indexTip = landmarks[8];
-                const pinchMidpoint = {
-                    x: (thumbTip.x + indexTip.x) / 2,
-                    y: (thumbTip.y + indexTip.y) / 2,
-                };
-                const canvasPoint = landmarkToCanvasPoint(
-                    pinchMidpoint,
-                    coverRect,
-                );
-                const ndcX = (canvasPoint.x / canvas.width) * 2 - 1;
-                const ndcY = -((canvasPoint.y / canvas.height) * 2 - 1);
-                callbacksRef.current.onPinchHold(ndcX, ndcY);
+                const pos = smoothedPositionsRef.current[slot];
+                callbacksRef.current.onPinchHold(pos.x, pos.y);
             }
 
             if (justEntered("fist") && callbacksRef.current.onFist) {
@@ -139,8 +154,17 @@ export function useHandTracking({ onPinchHold, onFist } = {}) {
 
         setGestureIds((current) =>
             current[0] === nextGestureIds[0] && current[1] === nextGestureIds[1]
-                ? current // avoid a pointless re-render if nothing changed
+                ? current
                 : nextGestureIds,
+        );
+
+        setHandPositions((current) =>
+            current[0].x === nextHandPositions[0].x &&
+            current[0].y === nextHandPositions[0].y &&
+            current[1].x === nextHandPositions[1].x &&
+            current[1].y === nextHandPositions[1].y
+                ? current
+                : nextHandPositions,
         );
     };
 
@@ -222,6 +246,7 @@ export function useHandTracking({ onPinchHold, onFist } = {}) {
         isRunning,
         statusText,
         gestureIds,
+        handPositions,
         startCamera,
         stopCamera,
     };

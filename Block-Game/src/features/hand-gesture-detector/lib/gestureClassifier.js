@@ -3,16 +3,13 @@ import { distance } from "./geometry";
 // Everything the UI needs to know about each gesture lives here.
 // Add/remove a gesture by editing this object + classifyGesture() below.
 export const GESTURES = {
-    open_palm: { label: "Open Palm", action: "Idle / Nothing" },
-    pinch: { label: "Pinch (Thumb + Index)", action: "Move cursor" },
-    pinch_hold: { label: "Pinch + Hold", action: "Place block" },
-    fist: { label: "Fist", action: "Delete block" },
-    index: { label: "Index Finger", action: "Point / Aim" },
-    peace: { label: "Peace Sign", action: "Switch build mode" },
-    thumbs_up: { label: "Thumbs Up", action: "Confirm / Save" },
-    thumbs_down: { label: "Thumbs Down", action: "Undo" },
-    spread: { label: "Five Fingers Spread", action: "Reset selection" },
-    three: { label: "Three Fingers", action: "Rotate block" },
+    open_palm: { label: "Open Palm", action: "Idle" },
+    pinch: { label: "Pinch", action: "Aim" },
+    pinch_hold: { label: "Pinch Hold", action: "Build" },
+    fist: { label: "Fist", action: "Delete" },
+    peace: { label: "Victory", action: "Confirm" },
+    thumbs_up: { label: "Thumbs Up", action: "Accept" },
+    thumbs_down: { label: "Thumbs Down", action: "Cancel" },
     none: { label: "No hand detected", action: "-" },
 };
 
@@ -48,7 +45,7 @@ function getExtendedFingers(landmarks) {
 // `pinchTracker` carries the pinch-start timestamp across calls so we can
 // detect "pinch held for 500ms" vs. a quick pinch.
 export function classifyGesture(landmarks, pinchTracker) {
-    const handSize = distance(landmarks[0], landmarks[9]); // wrist -> middle knuckle, scales thresholds to hand size/distance from camera
+    const handSize = distance(landmarks[0], landmarks[9]); // wrist -> middle knuckle
     const pinchDistance = distance(landmarks[4], landmarks[8]); // thumb tip -> index tip
     const isPinching = pinchDistance < handSize * 0.32;
 
@@ -61,24 +58,30 @@ export function classifyGesture(landmarks, pinchTracker) {
     pinchTracker.startedAt = null; // reset once the pinch releases
 
     const { thumb, index, middle, ring, pinky } = getExtendedFingers(landmarks);
-    const extendedCount = [thumb, index, middle, ring, pinky].filter(
-        Boolean,
-    ).length;
-
-    if (extendedCount === 0) return "fist";
-
-    if (thumb && !index && !middle && !ring && !pinky) {
-        // Thumb tip above the wrist (in image space, lower y = higher up) = thumbs up
-        return landmarks[4].y < landmarks[0].y ? "thumbs_up" : "thumbs_down";
-    }
-    if (!thumb && index && !middle && !ring && !pinky) return "index";
-    if (index && middle && !ring && !pinky) return "peace";
-    if (index && middle && ring && !pinky) return "three";
-
-    if (thumb && index && middle && ring && pinky) {
-        const spread = distance(landmarks[8], landmarks[20]); // index tip -> pinky tip
-        return spread > handSize * 1.3 ? "spread" : "open_palm";
+    
+    // Fist: all fingers folded (including thumb, or at most thumb barely extended but not in thumbs up position)
+    const extendedCountNonThumb = [index, middle, ring, pinky].filter(Boolean).length;
+    if (extendedCountNonThumb === 0 && !thumb) {
+        return "fist";
     }
 
-    return "open_palm";
+    // Thumbs Up / Thumbs Down: only thumb extended
+    if (thumb && extendedCountNonThumb === 0) {
+        // In MediaPipe space, Y increases downwards, so lower Y means higher up
+        // Compare thumb tip (4) with the thumb base IP joint (2)
+        return landmarks[4].y < landmarks[2].y ? "thumbs_up" : "thumbs_down";
+    }
+
+    // Victory (Peace): index and middle fingers extended, ring and pinky folded
+    if (index && middle && !ring && !pinky) {
+        return "peace";
+    }
+
+    // Open Palm: 4 or 5 fingers extended
+    const totalExtended = [thumb, index, middle, ring, pinky].filter(Boolean).length;
+    if (totalExtended >= 4) {
+        return "open_palm";
+    }
+
+    return "open_palm"; // Default to Idle
 }
